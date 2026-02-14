@@ -1,0 +1,253 @@
+@import "tailwindcss";
+
+/* CSS Variables for theming */
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card-bg: #ffffff;
+  --card-border: #d1d5db;
+  --input-bg: #f9fafb;
+  --input-border: #d1d5db;
+  --text-secondary: #6b7280;
+  --icon-bg: #f3f4f6;
+  --hover-bg: #e5e7eb;
+  --user-message-bg: #3b82f6;
+  --user-message-text: #ffffff;
+  --bot-message-bg: #f3f4f6;
+  --bot-message-text: #111827;
+  --sidebar-bg: #ffffff;
+  --active-chat-bg: #dbeafe;
+  --delete-hover: #fee2e2;
+  
+  /* Font size variables */
+  --font-size-small: 13px;
+  --font-size-medium: 14px;
+  --font-size-large: 16px;
+  --line-height-small: 1.5;
+  --line-height-medium: 1.6;
+  --line-height-large: 1.7;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ffffff;
+  --card-bg: #171717;
+  --card-border: #404040;
+  --input-bg: #1f1f1f;
+  --input-border: #404040;
+  --text-secondary: #d1d5db;
+  --icon-bg: #262626;
+  --hover-bg: #2d2d2d;
+  --user-message-bg: #2563eb;
+  --user-message-text: #ffffff;
+  --bot-message-bg: #262626;
+  --bot-message-text: #ffffff;
+  --sidebar-bg: #0f0f0f;
+  --active-chat-bg: #1e3a8a;
+  --delete-hover: #3f1f1f;
+}
+
+/* Base styles with performance optimizations */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Optimized global transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Viewport optimizations */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+#__next {
+  height: 100%;
+  overflow: hidden;
+}
+
+.h-screen {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Prevent zoom on input focus */
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+/* Optimized scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--icon-bg);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hover-bg);
+}
+
+/* Upload menu animation */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Performance optimizations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* Icon sizing consistency */
+.icon-xs {
+  width: 12px;
+  height: 12px;
+}
+
+.icon-sm {
+  width: 14px;
+  height: 14px;
+}
+
+.icon-base {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-lg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-xl {
+  width: 20px;
+  height: 20px;
+}
+
+/* Button sizing consistency */
+.btn-icon-sm {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-base {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-lg {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsive icon adjustments */
+@media (max-width: 640px) {
+  .icon-responsive {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .btn-icon-responsive {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (min-width: 641px) {
+  .icon-responsive {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .btn-icon-responsive {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Font size classes */
+.font-size-small {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.font-size-medium {
+  font-size: var(--font-size-medium);
+  line-height: var(--line-height-medium);
+}
+
+.font-size-large {
+  font-size: var(--font-size-large);
+  line-height: var(--line-height-large);
+}
+
+/* Custom select dropdown styling */
+select {
+  background-image: none;
+}
+
+select::-ms-expand {
+  display: none;
+}
