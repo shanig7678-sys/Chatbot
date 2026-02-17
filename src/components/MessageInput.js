@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import 'regenerator-runtime/runtime';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 // Constants
 const ACCEPTED_FILE_TYPES = {
@@ -38,12 +40,17 @@ const FILE_ICONS = {
 };
 
 const MessageInput = ({ onSendMessage, isLoading }) => {
-    const [message, setMessage] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
     const [showUploadOptions, setShowUploadOptions] = useState(false);
-    const [isRecording, setIsRecording] = useState(false);
-    const [isListening, setIsListening] = useState(false);
-    const [speechSupported, setSpeechSupported] = useState(false);
+    const [inputValue, setInputValue] = useState('');
+    
+    // Speech recognition hook from react-speech-recognition
+    const {
+        transcript,
+        listening,
+        resetTranscript,
+        browserSupportsSpeechRecognition
+    } = useSpeechRecognition();
     
     // Refs
     const fileInputRefs = {
@@ -51,156 +58,97 @@ const MessageInput = ({ onSendMessage, isLoading }) => {
         pdf: useRef(null),
         document: useRef(null)
     };
-    const recognitionRef = useRef(null);
+    const inputRef = useRef(null);
 
-    // Check speech recognition support
+    // Debug: Log speech recognition status
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                setSpeechSupported(true);
-            }
+        console.log('Speech Recognition Status:', {
+            browserSupport: browserSupportsSpeechRecognition,
+            listening,
+            transcript: transcript || '(empty)'
+        });
+    }, [browserSupportsSpeechRecognition, listening, transcript]);
+
+    // Sync transcript to input when listening
+    useEffect(() => {
+        if (transcript) {
+            console.log('Setting input value from transcript:', transcript);
+            setInputValue(transcript);
         }
-    }, []);
-
-    // Initialize speech recognition only when needed
-    const initializeSpeechRecognition = useCallback(() => {
-        if (typeof window === 'undefined') return null;
-        
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return null;
-
-        const recognition = new SpeechRecognition();
-        
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onstart = () => {
-            console.log('🎤 Speech recognition started');
-            setIsListening(true);
-        };
-
-        recognition.onresult = (event) => {
-            const transcript = Array.from(event.results)
-                .map(result => result[0])
-                .map(result => result.transcript)
-                .join('');
-
-            console.log('📝 Transcript:', transcript);
-            setMessage(transcript);
-        };
-
-        recognition.onerror = (event) => {
-            console.error('❌ Speech recognition error:', event.error);
-            setIsRecording(false);
-            setIsListening(false);
-            
-            if (event.error === 'not-allowed') {
-                alert('Microphone access denied. Please allow microphone access in your browser settings.');
-            } else if (event.error === 'no-speech') {
-                alert('No speech detected. Please try again.');
-            } else if (event.error === 'audio-capture') {
-                alert('Microphone not available. Please check your microphone connection.');
-            }
-        };
-
-        recognition.onend = () => {
-            console.log('🎤 Speech recognition ended');
-            setIsRecording(false);
-            setIsListening(false);
-        };
-
-        return recognition;
-    }, []);
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (recognitionRef.current) {
-                try {
-                    recognitionRef.current.stop();
-                } catch (error) {
-                    // Ignore errors on cleanup
-                }
-            }
-        };
-    }, []);
+    }, [transcript]);
 
     // Voice input handlers
-    const startVoiceInput = useCallback(() => {
-        if (!speechSupported) {
+    const startVoiceInput = useCallback(async () => {
+        if (!browserSupportsSpeechRecognition) {
             alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
             return;
         }
 
-        if (!recognitionRef.current) {
-            recognitionRef.current = initializeSpeechRecognition();
-            if (!recognitionRef.current) {
-                alert('Failed to initialize speech recognition.');
-                return;
+        try {
+            // Request microphone permission first
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            // Stop the stream immediately after permission is granted
+            stream.getTracks().forEach(track => track.stop());
+            
+            // Reset transcript before starting
+            resetTranscript();
+            
+            // Start listening with proper configuration
+            SpeechRecognition.startListening({ 
+                continuous: true,
+                language: 'en-US',
+                interimResults: true
+            });
+            
+            console.log('Voice input started successfully');
+        } catch (error) {
+            console.error('Speech recognition error:', error);
+            if (error.name === 'NotAllowedError') {
+                alert('Microphone access denied. Please allow microphone access in your browser settings.');
+            } else if (error.name === 'NotFoundError') {
+                alert('No microphone found. Please connect a microphone and try again.');
+            } else {
+                alert('Failed to start voice input: ' + error.message);
             }
         }
-
-        if (!isRecording) {
-            try {
-                setIsRecording(true);
-                recognitionRef.current.start();
-            } catch (error) {
-                console.error('Failed to start recognition:', error);
-                setIsRecording(false);
-                if (error.name === 'InvalidStateError') {
-                    // Recognition is already started, stop and restart
-                    recognitionRef.current.stop();
-                    setTimeout(() => {
-                        try {
-                            recognitionRef.current.start();
-                        } catch (e) {
-                            console.error('Failed to restart recognition:', e);
-                            setIsRecording(false);
-                        }
-                    }, 100);
-                }
-            }
-        }
-    }, [speechSupported, isRecording, initializeSpeechRecognition]);
+    }, [browserSupportsSpeechRecognition, resetTranscript]);
 
     const stopVoiceInput = useCallback(() => {
-        if (recognitionRef.current && isRecording) {
-            try {
-                recognitionRef.current.stop();
-            } catch (error) {
-                console.error('Failed to stop recognition:', error);
-                setIsRecording(false);
-                setIsListening(false);
-            }
-        }
-    }, [isRecording]);
+        SpeechRecognition.stopListening();
+    }, []);
 
     const toggleVoiceInput = useCallback(() => {
-        if (isRecording) {
+        if (listening) {
             stopVoiceInput();
         } else {
             startVoiceInput();
         }
-    }, [isRecording, startVoiceInput, stopVoiceInput]);
+    }, [listening, startVoiceInput, stopVoiceInput]);
 
     // Memoized validation
     const canSubmit = useMemo(() => {
-        return (message.trim() || selectedFile) && !isLoading;
-    }, [message, selectedFile, isLoading]);
+        return (inputValue.trim() || selectedFile) && !isLoading;
+    }, [inputValue, selectedFile, isLoading]);
 
     // Optimized submit handler
     const handleSubmit = useCallback((e) => {
         e.preventDefault();
+        
         if (canSubmit) {
-            const messageText = message.trim() || `Uploaded: ${selectedFile.file.name}`;
+            const messageText = inputValue.trim() || `Uploaded: ${selectedFile.file.name}`;
             onSendMessage(messageText);
-            setMessage('');
+            setInputValue('');
+            resetTranscript();
             setSelectedFile(null);
             setShowUploadOptions(false);
+            
+            // Stop listening after sending
+            if (listening) {
+                SpeechRecognition.stopListening();
+            }
         }
-    }, [canSubmit, message, selectedFile, onSendMessage]);
+    }, [canSubmit, inputValue, selectedFile, onSendMessage, resetTranscript, listening]);
 
     // Optimized file selection handler
     const handleFileSelect = useCallback((e, type) => {
@@ -293,7 +241,7 @@ const MessageInput = ({ onSendMessage, isLoading }) => {
             )}
 
             {/* Voice Recording Indicator */}
-            {isRecording && (
+            {listening && (
                 <div 
                     className="mb-2 sm:mb-3 px-3 sm:px-4 py-2 rounded-xl flex items-center gap-3 animate-pulse"
                     style={{ 
@@ -304,7 +252,7 @@ const MessageInput = ({ onSendMessage, isLoading }) => {
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
                         <span className="text-sm font-medium" style={{ color: '#ef4444' }}>
-                            {isListening ? 'Listening...' : 'Starting...'}
+                            Listening...
                         </span>
                     </div>
                     <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -428,32 +376,32 @@ const MessageInput = ({ onSendMessage, isLoading }) => {
                     </button>
 
                     {/* Voice Input Button */}
-                    {speechSupported && (
+                    {browserSupportsSpeechRecognition && (
                         <button 
                             type="button"
                             onClick={toggleVoiceInput}
                             className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center transition-all duration-300 rounded-full flex-shrink-0 relative overflow-hidden group"
                             style={{ 
-                                background: isRecording 
+                                background: listening 
                                     ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
                                     : 'var(--icon-bg)',
-                                boxShadow: isRecording ? '0 4px 12px rgba(239, 68, 68, 0.4)' : 'none',
-                                transform: isRecording ? 'scale(1.1)' : 'scale(1)'
+                                boxShadow: listening ? '0 4px 12px rgba(239, 68, 68, 0.4)' : 'none',
+                                transform: listening ? 'scale(1.1)' : 'scale(1)'
                             }}
                             onMouseEnter={(e) => {
-                                if (!isRecording) {
+                                if (!listening) {
                                     e.currentTarget.style.background = 'var(--hover-bg)';
                                     e.currentTarget.style.transform = 'scale(1.05)';
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (!isRecording) {
+                                if (!listening) {
                                     e.currentTarget.style.background = 'var(--icon-bg)';
                                     e.currentTarget.style.transform = 'scale(1)';
                                 }
                             }}
-                            aria-label={isRecording ? "Stop recording" : "Start voice input"}
-                            title={isRecording ? "Stop recording" : "Voice input"}
+                            aria-label={listening ? "Stop recording" : "Start voice input"}
+                            title={listening ? "Stop recording" : "Voice input"}
                             disabled={isLoading}
                         >
                             <span 
@@ -468,12 +416,12 @@ const MessageInput = ({ onSendMessage, isLoading }) => {
                                 className="sm:w-4 sm:h-4 relative z-10"
                                 viewBox="0 0 24 24" 
                                 fill="none" 
-                                stroke={isRecording ? 'white' : 'currentColor'} 
+                                stroke={listening ? 'white' : 'currentColor'} 
                                 strokeWidth="2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                             >
-                                {isRecording ? (
+                                {listening ? (
                                     <rect x="6" y="4" width="12" height="16" rx="2" />
                                 ) : (
                                     <>
@@ -488,9 +436,10 @@ const MessageInput = ({ onSendMessage, isLoading }) => {
                     )}
 
                     <input
+                        ref={inputRef}
                         type="text"
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
                         placeholder="Write a message or use voice..."
                         className="flex-1 bg-transparent outline-none text-sm min-w-0 input-field"
                         style={{ 

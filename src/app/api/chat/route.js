@@ -1,37 +1,62 @@
 import { NextResponse } from 'next/server';
 
 /**
- * AI Provider Configuration
- * Optimized for rapid responses
+ * AI Provider Configuration - Enterprise Grade
+ * Optimized for reliability and performance
  */
 const AI_PROVIDERS = {
     gemini: {
         name: 'Google Gemini',
-        model: 'gemini-2.5-flash', // Fastest model
-        apiVersion: 'v1beta',
-        baseUrl: 'https://generativelanguage.googleapis.com',
-        temperature: 0.7,
-        maxTokens: 1024, // Reduced for faster responses
+        model: 'gemini-2.5-flash',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
+        temperature: 0.8,
+        maxTokens: 2048,
         topP: 0.95,
         topK: 40,
     },
     openai: {
         name: 'OpenAI',
-        model: 'gpt-4o-mini', // Fast and efficient
+        model: 'gpt-4o-mini',
         endpoint: 'https://api.openai.com/v1/chat/completions',
-        temperature: 0.7,
-        maxTokens: 1024, // Reduced for faster responses
+        temperature: 0.8,
+        maxTokens: 2048,
     }
 };
 
 /**
- * System Prompt - Optimized for concise responses
+ * Enhanced System Prompt - Professional AI Assistant
+ * Optimized for natural, helpful, and engaging conversations
  */
-const SYSTEM_PROMPT = `You are a helpful AI assistant. Provide clear, concise, and direct answers. Be brief but informative.`;
+const SYSTEM_PROMPT = `You are an intelligent, helpful, and friendly AI assistant. Your responses should be:
+
+1. CLEAR & CONCISE: Get to the point quickly while being thorough
+2. NATURAL: Write like a knowledgeable human, not a robot
+3. HELPFUL: Anticipate follow-up questions and provide actionable information
+4. ACCURATE: If you're unsure, say so rather than guessing
+5. ENGAGING: Use examples and analogies when helpful
+
+Adapt your tone to match the user's style - be professional for technical questions, casual for general chat, and empathetic when appropriate.`;
+
+/**
+ * Format conversation history for context
+ */
+function formatConversationHistory(history) {
+    if (!Array.isArray(history) || history.length === 0) {
+        return '';
+    }
+
+    return history
+        .slice(-5) // Last 5 messages for better context
+        .map(msg => {
+            const role = msg.sender === 'user' ? 'User' : 'Assistant';
+            return `${role}: ${msg.text}`;
+        })
+        .join('\n\n');
+}
 
 /**
  * Google Gemini API Integration
- * Uses latest Gemini 2.5 Flash model with proper error handling
+ * Uses Gemini 1.5 Flash with proper error handling
  */
 async function callGeminiAPI(userMessage, conversationHistory = []) {
     const apiKey = process.env.GOOGLE_AI_API_KEY;
@@ -40,25 +65,16 @@ async function callGeminiAPI(userMessage, conversationHistory = []) {
         throw new Error('GOOGLE_AI_API_KEY not configured');
     }
 
-    // Build conversation context with system prompt
-    let conversationText = `${SYSTEM_PROMPT}\n\n`;
+    // Build conversation context
+    const historyText = formatConversationHistory(conversationHistory);
+    const fullPrompt = historyText 
+        ? `${SYSTEM_PROMPT}\n\n${historyText}\n\nUser: ${userMessage}\n\nAssistant:`
+        : `${SYSTEM_PROMPT}\n\nUser: ${userMessage}\n\nAssistant:`;
 
-    // Add only last 3 messages for faster processing
-    if (conversationHistory?.length > 0) {
-        const recentHistory = conversationHistory.slice(-3);
-        recentHistory.forEach(msg => {
-            const role = msg.sender === 'user' ? 'User' : 'Assistant';
-            conversationText += `${role}: ${msg.text}\n\n`;
-        });
-    }
+    // Construct API URL - Fixed endpoint
+    const url = `${AI_PROVIDERS.gemini.baseUrl}/${AI_PROVIDERS.gemini.model}:generateContent?key=${apiKey}`;
 
-    // Add current user message
-    conversationText += `User: ${userMessage}\n\nAssistant:`;
-
-    // Construct API URL
-    const url = `${AI_PROVIDERS.gemini.baseUrl}/${AI_PROVIDERS.gemini.apiVersion}/models/${AI_PROVIDERS.gemini.model}:generateContent?key=${apiKey}`;
-
-    console.log(`🔵 Calling ${AI_PROVIDERS.gemini.name} (${AI_PROVIDERS.gemini.model})`);
+    console.log('🔵 Calling Gemini API:', AI_PROVIDERS.gemini.model);
 
     const response = await fetch(url, {
         method: 'POST',
@@ -67,7 +83,7 @@ async function callGeminiAPI(userMessage, conversationHistory = []) {
         },
         body: JSON.stringify({
             contents: [{
-                parts: [{ text: conversationText }]
+                parts: [{ text: fullPrompt }]
             }],
             generationConfig: {
                 temperature: AI_PROVIDERS.gemini.temperature,
@@ -85,10 +101,9 @@ async function callGeminiAPI(userMessage, conversationHistory = []) {
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        const errorMsg = errorData.error?.message || `HTTP ${response.status}`;
-        console.error(`❌ Gemini API Error:`, errorMsg);
-        throw new Error(`Gemini API failed: ${errorMsg}`);
+        const errorText = await response.text();
+        console.error('❌ Gemini API Error:', response.status, errorText);
+        throw new Error(`Gemini API failed: ${response.status}`);
     }
 
     const data = await response.json();
@@ -97,11 +112,11 @@ async function callGeminiAPI(userMessage, conversationHistory = []) {
     const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!aiResponse) {
-        console.error('❌ No response text in Gemini response:', JSON.stringify(data, null, 2));
+        console.error('❌ No response text in Gemini response');
         throw new Error('Gemini returned empty response');
     }
 
-    console.log(`✅ Gemini response received (${aiResponse.length} chars)`);
+    console.log('✅ Gemini response received:', aiResponse.length, 'chars');
     return aiResponse.trim();
 }
 
@@ -124,10 +139,9 @@ async function callOpenAIAPI(userMessage, conversationHistory = []) {
         }
     ];
 
-    // Add only last 3 messages for faster processing
-    if (conversationHistory?.length > 0) {
-        const recentHistory = conversationHistory.slice(-3);
-        recentHistory.forEach(msg => {
+    // Add conversation history
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        conversationHistory.slice(-5).forEach(msg => {
             messages.push({
                 role: msg.sender === 'user' ? 'user' : 'assistant',
                 content: msg.text
@@ -141,7 +155,7 @@ async function callOpenAIAPI(userMessage, conversationHistory = []) {
         content: userMessage
     });
 
-    console.log(`🟢 Calling ${AI_PROVIDERS.openai.name} (${AI_PROVIDERS.openai.model})`);
+    console.log('🟢 Calling OpenAI API:', AI_PROVIDERS.openai.model);
 
     const response = await fetch(AI_PROVIDERS.openai.endpoint, {
         method: 'POST',
@@ -158,59 +172,67 @@ async function callOpenAIAPI(userMessage, conversationHistory = []) {
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        const errorMsg = errorData.error?.message || `HTTP ${response.status}`;
-        console.error(`❌ OpenAI API Error:`, errorMsg);
-        throw new Error(`OpenAI API failed: ${errorMsg}`);
+        const errorText = await response.text();
+        console.error('❌ OpenAI API Error:', response.status, errorText);
+        throw new Error(`OpenAI API failed: ${response.status}`);
     }
 
     const data = await response.json();
     const aiResponse = data.choices?.[0]?.message?.content;
 
     if (!aiResponse) {
-        console.error('❌ No response in OpenAI data:', JSON.stringify(data, null, 2));
+        console.error('❌ No response in OpenAI data');
         throw new Error('OpenAI returned empty response');
     }
 
-    console.log(`✅ OpenAI response received (${aiResponse.length} chars)`);
+    console.log('✅ OpenAI response received:', aiResponse.length, 'chars');
     return aiResponse.trim();
 }
 
 /**
  * Main POST Handler
- * Implements intelligent fallback strategy: Gemini → OpenAI → Error
+ * Implements intelligent fallback: OpenAI → Gemini → Error
  */
 export async function POST(request) {
     const startTime = Date.now();
     
     try {
         // Parse and validate request
-        const { message, conversationHistory } = await request.json();
+        const body = await request.json();
+        const { message, conversationHistory } = body;
+
+        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📨 New Chat Request');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         if (!message || typeof message !== 'string' || message.trim().length === 0) {
+            console.error('❌ Invalid message received');
             return NextResponse.json(
-                { error: 'Valid message is required' },
+                { 
+                    response: 'Please provide a valid message.',
+                    error: 'Invalid message',
+                    provider: 'error'
+                },
                 { status: 400 }
             );
         }
 
         const userMessage = message.trim();
+        console.log('📝 Message:', userMessage.substring(0, 100) + (userMessage.length > 100 ? '...' : ''));
+        console.log('📚 History:', conversationHistory?.length || 0, 'messages');
         
         // Check available API keys
         const hasGemini = !!process.env.GOOGLE_AI_API_KEY;
         const hasOpenAI = !!process.env.OPENAI_API_KEY;
 
-        console.log('\n📨 New chat request');
-        console.log(`   Message: "${userMessage.substring(0, 50)}${userMessage.length > 50 ? '...' : ''}"`);
-        console.log(`   History: ${conversationHistory?.length || 0} messages`);
-        console.log(`   Available: Gemini=${hasGemini}, OpenAI=${hasOpenAI}`);
+        console.log('🔑 API Keys:', { Gemini: hasGemini, OpenAI: hasOpenAI });
 
         if (!hasGemini && !hasOpenAI) {
+            console.error('❌ No API keys configured');
             return NextResponse.json({
-                response: 'No AI provider configured. Please add GOOGLE_AI_API_KEY or OPENAI_API_KEY to your .env.local file.',
+                response: '⚠️ No AI provider configured. Please add GOOGLE_AI_API_KEY or OPENAI_API_KEY to your .env.local file.',
                 provider: 'error',
-                error: 'No API keys configured',
-                timestamp: new Date().toISOString()
+                error: 'No API keys configured'
             }, { status: 503 });
         }
 
@@ -218,13 +240,13 @@ export async function POST(request) {
         let provider = null;
         let errors = [];
 
-        // Strategy 1: Try Gemini first (FREE, fast, high quality)
+        // Strategy 1: Try Gemini first (FREE and working!)
         if (hasGemini) {
             try {
                 aiResponse = await callGeminiAPI(userMessage, conversationHistory);
                 provider = 'gemini';
             } catch (geminiError) {
-                console.error(`❌ Gemini failed: ${geminiError.message}`);
+                console.error('❌ Gemini failed:', geminiError.message);
                 errors.push({ provider: 'gemini', error: geminiError.message });
             }
         }
@@ -235,7 +257,7 @@ export async function POST(request) {
                 aiResponse = await callOpenAIAPI(userMessage, conversationHistory);
                 provider = 'openai';
             } catch (openaiError) {
-                console.error(`❌ OpenAI failed: ${openaiError.message}`);
+                console.error('❌ OpenAI failed:', openaiError.message);
                 errors.push({ provider: 'openai', error: openaiError.message });
             }
         }
@@ -243,37 +265,34 @@ export async function POST(request) {
         // If both failed, return detailed error
         if (!aiResponse) {
             const errorDetails = errors.map(e => `${e.provider}: ${e.error}`).join('; ');
-            console.error('❌ All providers failed');
+            console.error('❌ All providers failed:', errorDetails);
             
             return NextResponse.json({
-                response: 'AI service temporarily unavailable. Please try again in a moment.',
+                response: '⚠️ AI service temporarily unavailable. Please try again in a moment.',
                 provider: 'error',
-                error: errorDetails,
-                timestamp: new Date().toISOString()
+                error: errorDetails
             }, { status: 503 });
         }
 
-        // Success! Return AI response
+        // Success!
         const duration = Date.now() - startTime;
-        console.log(`✅ Response generated in ${duration}ms via ${provider}`);
+        console.log('✅ Success! Provider:', provider, '| Duration:', duration + 'ms');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
         return NextResponse.json({
             response: aiResponse,
             provider: provider,
             model: provider === 'gemini' ? AI_PROVIDERS.gemini.model : AI_PROVIDERS.openai.model,
-            timestamp: new Date().toISOString(),
-            responseTime: duration,
-            messageLength: aiResponse.length
+            responseTime: duration
         });
 
     } catch (error) {
         console.error('💥 Unexpected error:', error);
         
         return NextResponse.json({
-            response: 'An unexpected error occurred. Please try again.',
+            response: '⚠️ An unexpected error occurred. Please try again.',
             provider: 'error',
-            error: error.message,
-            timestamp: new Date().toISOString()
+            error: error.message
         }, { status: 500 });
     }
 }

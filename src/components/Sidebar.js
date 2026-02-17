@@ -9,7 +9,7 @@ const MAX_SIDEBAR_WIDTH = 500;
 const DEFAULT_SIDEBAR_WIDTH = 256;
 const MOBILE_SIDEBAR_WIDTH = '80%';
 
-const Sidebar = ({ chats, activeChat, setActiveChat, createNewChat, deleteChat, isOpen, setIsOpen }) => {
+const Sidebar = ({ chats, activeChat, setActiveChat, createNewChat, deleteChat, clearAllChats, isOpen, setIsOpen }) => {
     const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
     const [isResizing, setIsResizing] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -178,50 +178,86 @@ const Sidebar = ({ chats, activeChat, setActiveChat, createNewChat, deleteChat, 
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2">
-                    {chats.map(chat => (
-                        <div
-                            key={chat.id}
-                            className="group flex items-center justify-between px-3 py-2 mb-1 rounded-lg cursor-pointer transition-all"
-                            style={{ 
-                                background: activeChat === chat.id ? 'var(--active-chat-bg)' : 'transparent',
-                                opacity: activeChat === chat.id ? 1 : 0.7
-                            }}
+                    {chats.length === 0 ? (
+                        <div className="text-center py-8 px-4">
+                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                No chats yet. Start a new conversation!
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            {chats.map(chat => (
+                                <div
+                                    key={chat.id}
+                                    className="group flex items-center justify-between px-3 py-2 mb-1 rounded-lg cursor-pointer transition-all"
+                                    style={{ 
+                                        background: activeChat === chat.id ? 'var(--active-chat-bg)' : 'transparent',
+                                        opacity: activeChat === chat.id ? 1 : 0.7
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (activeChat !== chat.id) {
+                                            e.currentTarget.style.background = 'var(--hover-bg)';
+                                            e.currentTarget.style.opacity = 1;
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (activeChat !== chat.id) {
+                                            e.currentTarget.style.background = 'transparent';
+                                            e.currentTarget.style.opacity = 0.7;
+                                        }
+                                    }}
+                                    onClick={() => handleChatSelect(chat.id)}
+                                >
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <svg width="14" height="14" className="flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                        </svg>
+                                        <span className="text-sm truncate">{chat.title}</span>
+                                    </div>
+                                    <button
+                                        onClick={(e) => handleDeleteChat(e, chat.id)}
+                                        className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded transition-all flex-shrink-0 ml-2"
+                                        style={{ background: 'transparent' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--delete-hover)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                        aria-label="Delete chat"
+                                    >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <polyline points="3 6 5 6 21 6"/>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            ))}
+                        </>
+                    )}
+                </div>
+
+                {chats.length > 0 && (
+                    <div className="px-4 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--card-border)' }}>
+                        <button
+                            onClick={clearAllChats}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-all"
+                            style={{ background: 'var(--icon-bg)', color: 'var(--foreground)' }}
                             onMouseEnter={(e) => {
-                                if (activeChat !== chat.id) {
-                                    e.currentTarget.style.background = 'var(--hover-bg)';
-                                    e.currentTarget.style.opacity = 1;
-                                }
+                                e.currentTarget.style.background = 'var(--delete-hover)';
+                                e.currentTarget.style.color = '#dc2626';
                             }}
                             onMouseLeave={(e) => {
-                                if (activeChat !== chat.id) {
-                                    e.currentTarget.style.background = 'transparent';
-                                    e.currentTarget.style.opacity = 0.7;
-                                }
+                                e.currentTarget.style.background = 'var(--icon-bg)';
+                                e.currentTarget.style.color = 'var(--foreground)';
                             }}
-                            onClick={() => handleChatSelect(chat.id)}
                         >
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <svg width="14" height="14" className="flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                                </svg>
-                                <span className="text-sm truncate">{chat.title}</span>
-                            </div>
-                            <button
-                                onClick={(e) => handleDeleteChat(e, chat.id)}
-                                className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded transition-all flex-shrink-0 ml-2"
-                                style={{ background: 'transparent' }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--delete-hover)'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                aria-label="Delete chat"
-                            >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <polyline points="3 6 5 6 21 6"/>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                </svg>
-                            </button>
-                        </div>
-                    ))}
-                </div>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                            <span className="font-medium text-sm">Clear All Chats</span>
+                        </button>
+                    </div>
+                )}
 
                 {isOpen && !isMobile && (
                     <div

@@ -50,7 +50,51 @@ const ChatInterface = () => {
                 console.error('Failed to parse saved settings:', error);
             }
         }
+
+        // Load chats from localStorage
+        const savedChats = localStorage.getItem('chatbot-chats');
+        if (savedChats) {
+            try {
+                const parsedChats = JSON.parse(savedChats);
+                setChats(parsedChats);
+            } catch (error) {
+                console.error('Failed to parse saved chats:', error);
+            }
+        }
+
+        // Load active chat ID from localStorage
+        const savedActiveChat = localStorage.getItem('chatbot-active-chat');
+        if (savedActiveChat) {
+            setActiveChat(Number(savedActiveChat));
+        }
+
+        // Load theme from localStorage
+        const savedTheme = localStorage.getItem('chatbot-theme');
+        if (savedTheme) {
+            setTheme(savedTheme);
+        }
     }, []);
+
+    // Save chats to localStorage whenever they change
+    useEffect(() => {
+        if (isMounted && chats.length > 0) {
+            localStorage.setItem('chatbot-chats', JSON.stringify(chats));
+        }
+    }, [chats, isMounted]);
+
+    // Save active chat to localStorage whenever it changes
+    useEffect(() => {
+        if (isMounted && activeChat) {
+            localStorage.setItem('chatbot-active-chat', String(activeChat));
+        }
+    }, [activeChat, isMounted]);
+
+    // Save theme to localStorage whenever it changes
+    useEffect(() => {
+        if (isMounted) {
+            localStorage.setItem('chatbot-theme', theme);
+        }
+    }, [theme, isMounted]);
 
     // Responsive sidebar handling
     useEffect(() => {
@@ -88,14 +132,32 @@ const ChatInterface = () => {
     }, []);
 
     const deleteChat = useCallback((chatId) => {
-        setChats(prev => prev.filter(chat => chat.id !== chatId));
+        setChats(prev => {
+            const newChats = prev.filter(chat => chat.id !== chatId);
+            // Update localStorage
+            if (newChats.length === 0) {
+                localStorage.removeItem('chatbot-chats');
+            }
+            return newChats;
+        });
         if (activeChat === chatId) {
             setActiveChat(null);
+            localStorage.removeItem('chatbot-active-chat');
         }
     }, [activeChat]);
 
+    const clearAllChats = useCallback(() => {
+        if (window.confirm('Are you sure you want to delete all chats? This cannot be undone.')) {
+            setChats([]);
+            setActiveChat(null);
+            localStorage.removeItem('chatbot-chats');
+            localStorage.removeItem('chatbot-active-chat');
+        }
+    }, []);
+
     const handleSendMessage = useCallback(async (message) => {
         let chatId = activeChat;
+        let conversationHistory = [];
 
         if (!chatId) {
             const newChat = {
@@ -107,6 +169,11 @@ const ChatInterface = () => {
             setChats(prev => [newChat, ...prev]);
             chatId = newChat.id;
             setActiveChat(chatId);
+            conversationHistory = []; // New chat has no history
+        } else {
+            // Get conversation history before adding new message
+            const currentChatData = chats.find(c => c.id === chatId);
+            conversationHistory = currentChatData?.messages || [];
         }
 
         // Add user message
@@ -133,9 +200,8 @@ const ChatInterface = () => {
 
         // Get AI response
         try {
-            // Get conversation history for context
-            const currentChatData = chats.find(c => c.id === chatId);
-            const conversationHistory = currentChatData?.messages || [];
+            console.log('Sending message to API:', message);
+            console.log('Conversation history:', conversationHistory.length, 'messages');
 
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -148,7 +214,10 @@ const ChatInterface = () => {
                 }),
             });
 
+            console.log('API Response status:', response.status);
+
             const data = await response.json();
+            console.log('API Response data:', data);
 
             // Always show the response, even if there was an error
             const botMessage = {
@@ -204,6 +273,7 @@ const ChatInterface = () => {
                     setActiveChat={setActiveChat}
                     createNewChat={createNewChat}
                     deleteChat={deleteChat}
+                    clearAllChats={clearAllChats}
                     isOpen={isSidebarOpen}
                     setIsOpen={setIsSidebarOpen}
                 />
